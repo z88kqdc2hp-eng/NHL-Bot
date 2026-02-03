@@ -84,4 +84,10 @@ def get_nhl_analysis():
         print(f"Erreur : {e}")
 
 if __name__ == "__main__":
-    get_nhl_analysis()
+    get_nhl_analysis() 
+                # ... (fin de ta boucle de matchs)
+            if count == 0:
+                msg = "🔍 **Scan NHL terminé** : Aucun match avec données buteurs n'est encore disponible. Nouveau scan automatique à 01h00."
+                api_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={ID}&text={urllib.parse.quote(msg)}&parse_mode=Markdown"
+                urllib.request.urlopen(api_url)
+
