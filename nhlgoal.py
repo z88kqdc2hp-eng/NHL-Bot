@@ -6,9 +6,9 @@ API_KEY = "b7191bd60e5363789c259b864ddc5367"
 TOKEN = "8341397638:AAENHUF8V4FoCenp9aR7ockDcHAGZgmN66s"
 ID = "1697906576"
 
-def get_nhl_analysis():
+def run_nhl_pro_analysis():
     now = datetime.utcnow()
-    # On récupère les cotes H2H, Totals et les "Player Props" si disponibles
+    # On demande spécifiquement les buteurs (player_anytime_goalscorer)
     url = f"https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds/?apiKey={API_KEY}&regions=us&markets=h2h,totals,player_anytime_goalscorer"
     
     try:
@@ -16,78 +16,60 @@ def get_nhl_analysis():
             data = json.loads(response.read().decode())
             
             for match in data:
-                commence_time = datetime.strptime(match['commence_time'], "%Y-%m-%dT%H:%M:%SZ")
-                if now < commence_time <= now + timedelta(hours=24):
-                    home = match['home_team']
-                    away = match['away_team']
+                date_m = datetime.strptime(match['commence_time'], "%Y-%m-%dT%H:%M:%SZ")
+                if now < date_m <= now + timedelta(hours=18):
+                    home, away = match['home_team'], match['away_team']
                     
-                    # 1. ANALYSE DU SCÉNARIO DE MATCH
+                    # 1. ANALYSE DES COTES RÉELLES
                     markets = match['bookmakers'][0]['markets']
                     h2h = next((m for m in markets if m['key'] == 'h2h'), None)
-                    totals = next((m for m in markets if m['key'] == 'totals'), None)
                     goalscorers = next((m for m in markets if m['key'] == 'player_anytime_goalscorer'), None)
+                    
+                    c_h = next(o['price'] for o in h2h['outcomes'] if o['name'] == home)
+                    c_a = next(o['price'] for o in h2h['outcomes'] if o['name'] == away)
 
-                    # Calcul des forces en présence
-                    c_home = next(o['price'] for o in h2h['outcomes'] if o['name'] == home)
-                    c_away = next(o['price'] for o in h2h['outcomes'] if o['name'] == away)
-                    
-                    # 2. DÉCISION STRATÉGIQUE (MISER QUOI ?)
-                    pari_principal = ""
-                    justification = ""
-                    
-                    # Si une équipe est archi-favorite (Cote < 1.60)
-                    if c_home < 1.65 or c_away < 1.65:
-                        fav = home if c_home < c_away else away
-                        pari_principal = f"🚩 VICTOIRE : {fav} (Sec)"
-                        justification = f"L'écart de niveau est trop grand pour risquer un buteur. Domination attendue de {fav}."
-                    # Si le match est ouvert (Total > 6.0)
-                    elif totals and totals['outcomes'][0]['point'] >= 6.0:
-                        pari_principal = "🎯 BUTEURS : Privilégier les marqueurs"
-                        justification = "Match à haut score projeté. Les gardiens sont vulnérables ce soir."
+                    # 2. LOGIQUE DE DÉCISION (VICOIRE VS BUTEURS)
+                    verdict = ""
+                    details = ""
+                    # Si une équipe est ultra favorite
+                    if c_h < 1.60 or c_a < 1.60:
+                        fav = home if c_h < c_a else away
+                        verdict = f"🚩 PRIORITÉ VICTOIRE : {fav}"
+                        details = f"L'écart de niveau est tel que la victoire sèche de {fav} est le pari le plus intelligent statistiquement."
                     else:
-                        pari_principal = "🛡️ DOUBLE CHANCE : Match fermé"
-                        justification = "Duel de gardiens probable. Peu de buts attendus, sécuriser le résultat."
+                        verdict = "🎯 OPTION BUTEURS : Match ouvert"
+                        details = "Les forces sont équilibrées, la valeur se trouve sur les performances individuelles."
 
-                    # 3. EXTRACTION DES VRAIS BUTEURS (SI DISPONIBLES)
-                    buteurs_noms = []
+                    # 3. EXTRACTION DES NOMS DES BUTEURS (DATA INDIVIDUELLE)
+                    top_scorers = []
                     if goalscorers:
-                        # On trie les buteurs par la cote la plus basse (plus forte probabilité)
+                        # On trie pour avoir les 2 plus probables (cotes les plus basses)
                         sorted_scorers = sorted(goalscorers['outcomes'], key=lambda x: x['price'])
-                        buteurs_noms = [f"{s['name']} (Cote: {s['price']})" for s in sorted_scorers[:2]]
+                        top_scorers = [f"🔥 {s['name']} (Cote: {s['price']})" for s in sorted_scorers[:2]]
                     else:
-                        buteurs_noms = ["Données buteurs non encore publiées par l'API", "Réessayez à 1h00"]
+                        top_scorers = ["⚠️ Noms indisponibles (trop tôt)", "Concentrez-vous sur le vainqueur"]
 
                     # 4. ENVOI DU RAPPORT UNIQUE
                     report = (
-                        f"🏒 **NHL UNIQUE ANALYST : {home} vs {away}**\n"
+                        f"🏒 **NHL DEEP ANALYST : {home} vs {away}**\n"
                         f"━━━━━━━━━━━━━━━━━━\n"
-                        f"📈 **STATISTIQUES MATCH**\n"
-                        f"• Force {home} : {c_home}\n"
-                        f"• Force {away} : {c_away}\n"
-                        f"• Tendance score : {totals['outcomes'][0]['point'] if totals else 'N/A'} buts\n"
+                        f"📊 **VERDICT STRATÉGIQUE**\n"
+                        f"👉 {verdict}\n"
+                        f"📝 {details}\n"
                         f"━━━━━━━━━━━━━━━━━━\n"
-                        f"💡 **VERDICT DU MODÈLE**\n"
-                        f"👉 {pari_principal}\n"
-                        f"📝 {justification}\n"
+                        f"🎯 **BUTEURS CIBLÉS (TOP PROB.)**\n"
+                        f"1️⃣ {top_scorers[0]}\n"
+                        f"2️⃣ {top_scorers[1] if len(top_scorers)>1 else ''}\n"
                         f"━━━━━━━━━━━━━━━━━━\n"
-                        f"🔥 **BUTEURS PROBABLES (+80% CONF.)**\n"
-                        f"1️⃣ {buteurs_noms[0]}\n"
-                        f"2️⃣ {buteurs_noms[1]}\n"
+                        f"💡 **ANALYSE INDIVIDUELLE**\n"
+                        f"Le modèle détecte une pression offensive de {int((1/min(c_h,c_a))*100)}% pour le favori. {'Le PowerPlay sera la clé.' if 'BUTEURS' in verdict else 'La défense adverse est trop solide pour isoler un buteur.'}\n"
                         f"━━━━━━━━━━━━━━━━━━"
                     )
                     
-                    encoded_msg = urllib.parse.quote(report)
-                    api_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={ID}&text={encoded_msg}&parse_mode=Markdown"
+                    api_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={ID}&text={urllib.parse.quote(report)}&parse_mode=Markdown"
                     urllib.request.urlopen(api_url)
-
     except Exception as e:
         print(f"Erreur : {e}")
 
 if __name__ == "__main__":
-    get_nhl_analysis() 
-                # ... (fin de ta boucle de matchs)
-            if count == 0:
-                msg = "🔍 **Scan NHL terminé** : Aucun match avec données buteurs n'est encore disponible. Nouveau scan automatique à 01h00."
-                api_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={ID}&text={urllib.parse.quote(msg)}&parse_mode=Markdown"
-                urllib.request.urlopen(api_url)
-
+    run_nhl_pro_analysis()
