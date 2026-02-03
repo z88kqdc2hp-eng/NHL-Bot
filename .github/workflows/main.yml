@@ -1,0 +1,16 @@
+name: NHL Sniper Bot
+on:
+  schedule:
+    - cron: '0 22 * * *'  # 23h00 FR
+    - cron: '0 23 * * *'  # 00h00 FR
+    - cron: '0 0 * * *'   # 01h00 FR (Vérification finale)
+  workflow_dispatch:      # Permet de le lancer à la main pour tester
+jobs:
+  run-nhl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - run: python nhlgoal.py
